@@ -1,0 +1,4 @@
+import { CheckCircle2, CircleAlert, Clock3, LoaderCircle, ShieldAlert } from "lucide-react";
+import type { ClaimStatus, EvidenceStatus, VerdictName } from "@/types/claims";
+type Status = ClaimStatus | EvidenceStatus | VerdictName;
+export function StatusBadge({ status }: { status: Status }) { const type = status === "APPROVED" || status === "UPLOADED" || status === "FINALIZED" ? "success" : status === "DENIED" || status === "FAILED" ? "danger" : status === "ESCALATED" || status === "UNDETERMINED" ? "warning" : "neutral"; const Icon = type === "success" ? CheckCircle2 : type === "danger" ? CircleAlert : type === "warning" ? ShieldAlert : status === "UPLOADING" || status === "HASHING" || status === "VALIDATING" ? LoaderCircle : Clock3; return <span className={`badge ${type}`}><Icon size={14} className={status === "UPLOADING" || status === "HASHING" || status === "VALIDATING" ? "spin" : ""} />{status.replaceAll("_", " ")}</span>; }
