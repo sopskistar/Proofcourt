@@ -2,3 +2,6 @@ node_modules/
 .next/
 .env.local
 *.log
+*.tsbuildinfo
+__pycache__/
+.proofcourt-data/

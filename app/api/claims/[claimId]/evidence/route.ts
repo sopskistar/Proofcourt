@@ -1,0 +1,10 @@
+import { randomUUID } from "node:crypto";
+import { NextRequest, NextResponse } from "next/server";
+import { ApiError, fail } from "@/lib/server/errors";
+import { sha256 } from "@/lib/server/canonicalize";
+import { store } from "@/lib/server/store";
+export const runtime = "nodejs";
+const accepted: Record<string, string> = { "application/pdf": ".pdf", "image/jpeg": ".jpg", "image/png": ".png", "text/plain": ".txt" };
+const safeName = (name: string) => name.replace(/[^a-zA-Z0-9._ -]/g, "_");
+export async function GET(_request: NextRequest, { params }: { params: Promise<{ claimId: string }> }) { try { const evidence = await store.evidence((await params).claimId); if (!evidence) throw new ApiError(404, "CLAIM_NOT_FOUND", "Claim not found."); return NextResponse.json(evidence); } catch (error) { return fail(error); } }
+export async function POST(request: NextRequest, { params }: { params: Promise<{ claimId: string }> }) { try { const claimId = (await params).claimId; if (!await store.get(claimId)) throw new ApiError(404, "CLAIM_NOT_FOUND", "Claim not found."); const file = (await request.formData()).get("file"); if (!(file instanceof File)) throw new ApiError(400, "FILE_REQUIRED", "Attach an evidence file."); const extension = accepted[file.type]; if (!extension || !file.name.toLowerCase().endsWith(extension) && !(file.type === "image/jpeg" && file.name.toLowerCase().endsWith(".jpeg"))) throw new ApiError(422, "UNSUPPORTED_EVIDENCE", "Use a PDF, JPG, PNG, or TXT file."); if (!file.name || file.size === 0 || file.size > 10 * 1024 * 1024) throw new ApiError(422, "INVALID_EVIDENCE_SIZE", "Evidence must be between 1 byte and 10 MB."); const bytes = Buffer.from(await file.arrayBuffer()); const hash = sha256(bytes); const evidence = await store.addEvidence(claimId, { id: `EV-${randomUUID()}`, claimId, filename: safeName(file.name), mimeType: file.type, size: bytes.length, hash, status: "UPLOADED", createdAt: new Date().toISOString() }, bytes); if (!evidence) throw new ApiError(404, "CLAIM_NOT_FOUND", "Claim not found."); return NextResponse.json(evidence, { status: 201 }); } catch (error) { return fail(error); } }
