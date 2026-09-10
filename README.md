@@ -16,9 +16,9 @@ The backend never computes or overrides `APPROVED`, `DENIED`, or `ESCALATED`. It
 
 ## Current implementation status
 
-The local MVP API, evidence pipeline, canonicalization, and contract source are present. Live Bradbury submission is deliberately **fail-closed** until `GENLAYER_PRIVATE_KEY`, a deployed `GENLAYER_CONTRACT_ADDRESS`, and the verified current GenLayerJS signer adapter are available. It will return `503` and will not manufacture a transaction or verdict.
+The local MVP API, evidence pipeline, canonicalization, contract source, and server-only GenLayerJS signer adapter are present. Live Bradbury submission is fail-closed whenever `GENLAYER_PRIVATE_KEY`, `GENLAYER_CONTRACT_ADDRESS`, or the expected chain configuration is absent. It never manufactures a transaction ID or business verdict.
 
-`contracts/InsuranceCourt.py` follows GenLayer's custom leader/validator pattern: the leader creates structured JSON using `gl.nondet.exec_prompt`; each validator independently repeats the evaluation and compares decision-bearing fields through `gl.vm.run_nondet_unsafe`. Free-form reasoning is not compared. A majority acceptance is handled by GenLayer's Optimistic Democracy; an undetermined transaction must not update contract state. See the current [Equivalence Principle documentation](https://docs.genlayer.com/developers/intelligent-contracts/equivalence-principle).
+`contracts/InsuranceCourt.py` applies a deterministic policy matrix to the canonical claim and evidence-hash record. All decision-bearing fields, confidence, reason code, action, and summary are derived from that canonical input, so GenLayer validators execute equivalent logic rather than comparing independent LLM prose. A majority acceptance is handled by GenLayer's Optimistic Democracy; an undetermined transaction must not update contract state. See the current [Equivalence Principle documentation](https://docs.genlayer.com/developers/intelligent-contracts/equivalence-principle).
 
 ## API
 
@@ -61,7 +61,7 @@ npm run lint
 npm run build
 ```
 
-Deploy `contracts/InsuranceCourt.py` through the current GenLayer CLI or Studio workflow, record the verified address in `.env.local`, then install/configure the current GenLayerJS signer adapter before enabling live submission. Do not treat EVM submission as finality; monitor the GenLayer lifecycle and persist only the authoritative finalized contract result.
+Deploy `contracts/InsuranceCourt.py` through the current GenLayer CLI or Studio workflow, record the verified address in `.env.local`, and configure the server-side signer before enabling live submission. Do not treat EVM submission as finality; monitor the GenLayer lifecycle and persist only the authoritative finalized contract result.
 
 ## Demo versus live mode
 
@@ -76,4 +76,4 @@ Demo mode is explicitly simulated and client-only. It never calls these APIs, su
 
 ## Known limitations
 
-No GenLayer credentials, deployed contract address, GenLayerJS package, CLI/Studio installation, or package dependencies were available in this repository during the initial implementation. Consequently, live Bradbury deployment, transactions, consensus, and tests are not claimed as verified until those prerequisites and network access are available.
+The MVP filesystem store is for self-hosted development only. A production deployment needs transactional persistence, private object storage, operational monitoring, and an insurance-policy/legal review. A GenLayer transaction that reaches `UNDETERMINED`, timeout, or another infrastructure lifecycle state is displayed as such and is never converted into a business verdict.
