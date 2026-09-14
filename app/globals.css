@@ -30,13 +30,19 @@
 .hero-scene-sticky{padding-bottom:112px}.brand{gap:10px;line-height:1}.brand-mark{width:31px;height:31px;border-radius:8px}.brand-mark svg{stroke-width:2.15}.button svg{stroke-width:2.25}.integrity-note{max-width:820px}.verification-boundary{max-width:980px}.field-help{max-width:580px}
 @media(max-width:760px){.hero-scene-sticky{padding-bottom:47px}.brand-mark{width:30px;height:30px}}
 
-/* Compact-screen containment and interaction refinements. */
-html,body{max-width:100%;overflow-x:clip}
+/* Compact-screen interaction refinements. */
 .container,.card,.process,.flow-card,.story-visual,.hero-cinematic,.demo-card{min-width:0;max-width:100%}
 
 @media(max-width:760px){
-  .menu-open{overflow:hidden;overscroll-behavior:none}
-  .nav nav{inset:65px 0 0;width:100%;max-width:100%;padding:30px 28px 36px;background:var(--brand);box-shadow:0 18px 42px #17202740;overflow-y:auto;overscroll-behavior:contain;transform:none;clip-path:inset(0 0 0 100%);transition:clip-path .36s var(--ease),opacity .2s ease}
+  html.menu-open,body.menu-open{overflow:hidden;overscroll-behavior:none}
+  /*
+   * This nav is inside the sticky, backdrop-filtered header. On Android that
+   * header becomes the containing block for fixed descendants, which made the
+   * old fixed drawer only as tall as the header and clipped its links. Keep
+   * the existing drawer in the hierarchy, but position it below the header
+   * and size it to the live viewport instead.
+   */
+  .nav nav{position:absolute;inset:100% 0 auto;width:100%;max-width:100%;height:calc(100vh - 65px);height:calc(100dvh - 65px);min-height:0;padding:30px 28px 36px;background:var(--brand);box-shadow:0 18px 42px #17202740;overflow-x:clip;overflow-y:auto;overscroll-behavior:contain;z-index:1;transform:none;clip-path:inset(0 0 0 100%);transition:clip-path .36s var(--ease),opacity .2s ease}
   .nav nav.is-open{clip-path:inset(0);transform:none}
   .nav nav>a:not(.button){font-size:24px;line-height:1.2;color:#fff}
   .nav nav>a:not(.button):after{background:#e4bc7e}
