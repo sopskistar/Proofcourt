@@ -22,6 +22,12 @@ function settings() {
   return { rpcUrl, privateKey: privateKey as `0x${string}`, contractAddress: contractAddress as `0x${string}` };
 }
 function client(rpcUrl: string, privateKey?: `0x${string}`) { return createClient({ chain: testnetBradbury, endpoint: rpcUrl, ...(privateKey ? { account: createAccount(privateKey) } : {}) }); }
+function submissionErrorDetail(error: unknown, privateKey: string) {
+  const message = error instanceof Error ? error.message : "Unknown GenLayer error";
+  // Preserve the SDK/RPC diagnostic while ensuring a signer credential cannot
+  // escape to a client response or application log.
+  return message.replaceAll(privateKey, "[REDACTED]");
+}
 function readRpcUrl() {
   const rpcUrl = process.env.GENLAYER_RPC_URL?.trim();
   const configuredChainId = process.env.GENLAYER_CHAIN_ID?.trim();
@@ -41,7 +47,8 @@ function verdictFrom(value: unknown): Verdict | undefined {
   if (verdict !== "APPROVED" && verdict !== "DENIED" && verdict !== "ESCALATED") return undefined;
   const boolean = (name: string) => typeof result[name] === "boolean" ? result[name] : undefined;
   const string = (name: string) => typeof result[name] === "string" ? result[name] : undefined;
-  return { verdict, confidence: typeof result.confidence === "number" ? result.confidence : undefined, coveredEvent: boolean("covered_event"), evidenceSufficient: boolean("evidence_sufficient"), lossSupported: boolean("loss_supported"), policyMatch: boolean("policy_match"), reasonCode: string("reason_code"), recommendedAction: string("recommended_action"), reasoningSummary: string("reasoning_summary"), timestamp: new Date().toISOString() };
+  const verificationStatus = string("evidence_verification_status");
+  return { verdict, confidence: typeof result.confidence === "number" ? result.confidence : undefined, coveredEvent: boolean("covered_event"), evidenceSufficient: boolean("evidence_sufficient"), evidenceContentVerified: boolean("evidence_content_verified"), evidenceVerificationStatus: verificationStatus === "NOT_REQUESTED" || verificationStatus === "VERIFIED" || verificationStatus === "INCONCLUSIVE" || verificationStatus === "REJECTED" ? verificationStatus : undefined, lossSupported: boolean("loss_supported"), policyMatch: boolean("policy_match"), reasonCode: string("reason_code"), recommendedAction: string("recommended_action"), reasoningSummary: string("reasoning_summary"), timestamp: new Date().toISOString() };
 }
 /**
  * Phase 2's read-only transaction metadata check. A claim may reference a Bradbury
@@ -49,7 +56,7 @@ function verdictFrom(value: unknown): Verdict | undefined {
  * This observation cannot establish evidence truth, claim relevance, or alter a
  * ProofCourt business verdict.
  */
-export async function verifyOnchainReference(referenceId?: string): Promise<OnchainVerification> {
+export async function verifyOnchainReference(referenceId?: string, expected?: Pick<Claim, "onchainExpectedSender" | "onchainExpectedRecipient" | "onchainExpectedValue">): Promise<OnchainVerification> {
   const reference = referenceId?.trim(); const observedAt = new Date().toISOString();
   if (!reference) return { method: "GENLAYER_TRANSACTION_LOOKUP", status: "NOT_PROVIDED", observedAt, message: "No GenLayer transaction reference was provided." };
   if (!/^0x[0-9a-fA-F]{64}$/.test(reference)) return { method: "GENLAYER_TRANSACTION_LOOKUP", status: "INVALID_REFERENCE", reference, observedAt, message: "This reference is not a 32-byte GenLayer transaction ID, so no on-chain lookup was performed." };
@@ -58,7 +65,13 @@ export async function verifyOnchainReference(referenceId?: string): Promise<Onch
   try {
     const transaction = await client(rpcUrl).getTransaction({ hash: reference as never });
     const lifecycle = transaction.statusName || (typeof transaction.status === "string" ? transaction.status : undefined);
-    return { method: "GENLAYER_TRANSACTION_LOOKUP", status: "LOCATED", reference, transactionId: transaction.txId || transaction.hash || reference, sender: transaction.sender || transaction.from_address, recipient: transaction.recipient || transaction.to_address, value: transaction.value == null ? undefined : String(transaction.value), lifecycle, executionResult: transaction.txExecutionResultName, observedAt, message: "The referenced GenLayer transaction was located on Bradbury. This only confirms transaction metadata, not the truth of uploaded evidence." };
+    const sender = transaction.sender || transaction.from_address; const recipient = transaction.recipient || transaction.to_address; const value = transaction.value == null ? undefined : String(transaction.value);
+    const expectedSender = expected?.onchainExpectedSender?.toLowerCase(); const expectedRecipient = expected?.onchainExpectedRecipient?.toLowerCase(); const expectedValue = expected?.onchainExpectedValue;
+    const checks = [["sender", expectedSender, sender?.toLowerCase()], ["recipient", expectedRecipient, recipient?.toLowerCase()], ["value", expectedValue, value]] as const;
+    const requested = checks.filter(([, wanted]) => Boolean(wanted)); const matchedFields = requested.filter(([, wanted, actual]) => wanted === actual).map(([field]) => field);
+    const status = requested.length === 0 ? "LOCATED" : matchedFields.length === requested.length ? "VERIFIED" : "MISMATCHED";
+    const message = status === "VERIFIED" ? "The referenced GenLayer transaction was located and every supplied objective field matched." : status === "MISMATCHED" ? "The referenced transaction was located, but one or more supplied objective fields did not match." : "The referenced GenLayer transaction was located on Bradbury. This only confirms transaction metadata, not the truth of uploaded evidence.";
+    return { method: "GENLAYER_TRANSACTION_LOOKUP", status, reference, transactionId: transaction.txId || transaction.hash || reference, sender, recipient, value, lifecycle, executionResult: transaction.txExecutionResultName, expectedSender: expected?.onchainExpectedSender || undefined, expectedRecipient: expected?.onchainExpectedRecipient || undefined, expectedValue, matchedFields, observedAt, message };
   } catch {
     return { method: "GENLAYER_TRANSACTION_LOOKUP", status: "UNAVAILABLE", reference, observedAt, message: "The GenLayer network could not confirm this reference at the time of lookup." };
   }
@@ -73,7 +86,9 @@ export async function submitAdjudication(_claim: Claim, canonical: string, hash:
     return { genlayerTransactionId, contractAddress, network: "Bradbury", chainId: BRADBURY_CHAIN_ID, finalizationStatus: "PENDING", submittedAt: new Date().toISOString(), claimHash: hash, explorerUrl: `${explorerBase}/transactions/${genlayerTransactionId}` };
   } catch (error) {
     if (error instanceof ApiError) throw error;
-    throw new ApiError(502, "GENLAYER_SUBMISSION_FAILED", "GenLayer did not accept the adjudication transaction. No verdict was created.", { cause: error instanceof Error ? error.message : "Unknown GenLayer error" });
+    const cause = submissionErrorDetail(error, privateKey);
+    console.error("GenLayer adjudication submission failed", { contractAddress, claimHash: hash, cause });
+    throw new ApiError(502, "GENLAYER_SUBMISSION_FAILED", "GenLayer did not accept the adjudication transaction. No verdict was created.", { cause });
   }
 }
 /** Polls authoritative transaction state. It never derives a business verdict itself. */

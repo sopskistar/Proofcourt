@@ -11,7 +11,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 export const claimApi = {
   create: (draft: ClaimDraft, idempotencyKey: string) => request<Claim>("/api/claims", { method: "POST", headers: { "Idempotency-Key": idempotencyKey }, body: JSON.stringify(draft) }),
-  uploadEvidence: (claimId: string, file: File) => { const data = new FormData(); data.append("file", file); return request<Evidence>(`/api/claims/${claimId}/evidence`, { method: "POST", body: data }); },
+  uploadEvidence: (claimId: string, file: File, publicSourceUrl?: string, verificationAssertion?: string) => { const data = new FormData(); data.append("file", file); if (publicSourceUrl) data.append("publicSourceUrl", publicSourceUrl); if (verificationAssertion) data.append("verificationAssertion", verificationAssertion); return request<Evidence>(`/api/claims/${claimId}/evidence`, { method: "POST", body: data }); },
   adjudicate: (claimId: string, idempotencyKey: string) => request<Claim>(`/api/claims/${claimId}/adjudicate`, { method: "POST", headers: { "Idempotency-Key": idempotencyKey }, body: JSON.stringify({}) }),
   get: (claimId: string) => request<Claim>(`/api/claims/${claimId}`),
   getVerdict: (claimId: string) => request<Verdict>(`/api/claims/${claimId}/verdict`),
