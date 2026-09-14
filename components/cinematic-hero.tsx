@@ -10,27 +10,30 @@ const stages = ["Claim", "Evidence", "Verification", "Consensus", "Verdict", "Fi
 export function CinematicHero() {
   const ref = useRef<HTMLElement>(null);
   const [progress, setProgress] = useState(0);
-  const [staticMode, setStaticMode] = useState(false);
+  const [reducedMotion, setReducedMotion] = useState(false);
 
   useEffect(() => {
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const compact = window.matchMedia("(max-width: 760px)");
-    const updateMode = () => setStaticMode(reduced.matches || compact.matches);
-    updateMode();
-    reduced.addEventListener("change", updateMode);
-    compact.addEventListener("change", updateMode);
-    return () => { reduced.removeEventListener("change", updateMode); compact.removeEventListener("change", updateMode); };
+    const updatePreference = () => setReducedMotion(reduced.matches);
+    updatePreference();
+    reduced.addEventListener("change", updatePreference);
+    return () => reduced.removeEventListener("change", updatePreference);
   }, []);
 
   useEffect(() => {
-    if (staticMode) { setProgress(1); return; }
+    if (reducedMotion) { setProgress(1); return; }
     let frame = 0;
     const update = () => {
       frame = 0;
       const node = ref.current;
       if (!node) return;
       const bounds = node.getBoundingClientRect();
-      const travel = Math.max(1, bounds.height - window.innerHeight);
+      const compact = window.matchMedia("(max-width: 760px)").matches;
+      // The compact scene has a deliberately short sticky tail. Map that tail to
+      // the same stages as desktop instead of freezing the visual on phones.
+      const travel = compact
+        ? Math.max(1, bounds.height - window.innerHeight * .72)
+        : Math.max(1, bounds.height - window.innerHeight);
       const next = Math.min(1, Math.max(0, -bounds.top / travel));
       setProgress(previous => Math.abs(previous - next) > .006 ? next : previous);
     };
@@ -39,7 +42,7 @@ export function CinematicHero() {
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onScroll);
     return () => { window.removeEventListener("scroll", onScroll); window.removeEventListener("resize", onScroll); if (frame) cancelAnimationFrame(frame); };
-  }, [staticMode]);
+  }, [reducedMotion]);
 
   const active = Math.min(stages.length - 1, Math.round(progress * (stages.length - 1)));
   const visualStyle = {
