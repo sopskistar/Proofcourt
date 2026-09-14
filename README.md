@@ -18,6 +18,8 @@ The backend never computes or overrides `APPROVED`, `DENIED`, or `ESCALATED`. It
 
 The local MVP API, evidence pipeline, canonicalization, contract source, and server-only GenLayerJS signer adapter are present. Live Bradbury submission is fail-closed whenever `GENLAYER_PRIVATE_KEY`, `GENLAYER_CONTRACT_ADDRESS`, or the expected chain configuration is absent. It never manufactures a transaction ID or business verdict.
 
+Phase 1 (Evidence → Consensus → Verdict) is complete. Phase 2 is current / in development. Its first safe capability is a read-only transaction metadata lookup: if a claimant supplies a 32-byte GenLayer transaction reference, the backend uses GenLayerJS to locate its stored Bradbury transaction state and persists objective metadata. This check never writes to GenLayer, never changes the deployed contract, and never creates or overrides a verdict. It also does **not** prove that an uploaded file is truthful or that it relates to the located transaction. Phases 3–5 (multi-source intelligence, insurance pools/payouts, and a decentralized marketplace) are future roadmap only.
+
 `contracts/InsuranceCourt.py` applies a deterministic policy matrix to the canonical claim and evidence-hash record. All decision-bearing fields, confidence, reason code, action, and summary are derived from that canonical input, so GenLayer validators execute equivalent logic rather than comparing independent LLM prose. A majority acceptance is handled by GenLayer's Optimistic Democracy; an undetermined transaction must not update contract state. See the current [Equivalence Principle documentation](https://docs.genlayer.com/developers/intelligent-contracts/equivalence-principle).
 
 ## API
@@ -32,6 +34,14 @@ The local MVP API, evidence pipeline, canonicalization, contract source, and ser
 ## Canonicalization
 
 `lib/server/canonicalize.ts` normalizes string whitespace and line endings, serializes a fixed schema with fixed field order, normalizes the incident timestamp to ISO-8601, fixes loss amounts to two decimals, uppercases currency, and sorts evidence by hash/MIME type/size. SHA-256 is then taken over that canonical JSON. UI-only fields, generated IDs, filenames, storage paths, timestamps, and insertion order do not affect the claim hash.
+
+## Evidence boundaries and Phase 2
+
+The upload API accepts private PDF, JPG/JPEG, PNG, and TXT bytes, stores them outside the public API, and derives a SHA-256 fingerprint. The canonical claim sent to the currently deployed `InsuranceCourt` contains claim metadata plus each evidence item's hash, MIME type, and size—not file bytes, file contents, or a private storage URL. Consequently, current GenLayer validators can evaluate only that canonical record and cannot independently inspect a claimant's private upload.
+
+SHA-256 establishes evidence integrity: it identifies the exact bytes that were submitted and detects later modification. It does not establish authenticity or truthfulness. The Phase 2 transaction lookup is intentionally separate: it can locate a supplied GenLayer transaction and record public metadata (for example lifecycle, sender, recipient, and value), but it cannot prove the claim or uploaded evidence is true.
+
+Current GenLayer capabilities support validator-side [web access](https://docs.genlayer.com/developers/intelligent-contracts/features/web-access) and [image processing](https://docs.genlayer.com/developers/intelligent-contracts/features/image-processing). Applying either to private evidence would require a deliberate evidence-delivery design, new contract interface, and deployment. ProofCourt does not expose private evidence or redeploy the working contract merely to add that capability.
 
 ## Persistence and recovery
 

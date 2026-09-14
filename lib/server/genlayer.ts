@@ -1,7 +1,7 @@
 import { createAccount, createClient } from "genlayer-js";
 import { testnetBradbury } from "genlayer-js/chains";
 import { ExecutionResult } from "genlayer-js/types";
-import type { Claim, ClaimStatus, Transaction, Verdict } from "@/types/claims";
+import type { Claim, ClaimStatus, OnchainVerification, Transaction, Verdict } from "@/types/claims";
 import { ApiError } from "@/lib/server/errors";
 
 const BRADBURY_CHAIN_ID = 4221;
@@ -22,6 +22,11 @@ function settings() {
   return { rpcUrl, privateKey: privateKey as `0x${string}`, contractAddress: contractAddress as `0x${string}` };
 }
 function client(rpcUrl: string, privateKey?: `0x${string}`) { return createClient({ chain: testnetBradbury, endpoint: rpcUrl, ...(privateKey ? { account: createAccount(privateKey) } : {}) }); }
+function readRpcUrl() {
+  const rpcUrl = process.env.GENLAYER_RPC_URL?.trim();
+  const configuredChainId = process.env.GENLAYER_CHAIN_ID?.trim();
+  return rpcUrl && Number(configuredChainId) === BRADBURY_CHAIN_ID ? rpcUrl : undefined;
+}
 function statusFor(lifecycle: string, execution: unknown): ClaimStatus {
   if (lifecycle === "FINALIZED") return execution === ExecutionResult.FINISHED_WITH_RETURN ? "FINALIZED" : "FAILED";
   if (lifecycle === "UNDETERMINED") return "UNDETERMINED";
@@ -37,6 +42,26 @@ function verdictFrom(value: unknown): Verdict | undefined {
   const boolean = (name: string) => typeof result[name] === "boolean" ? result[name] : undefined;
   const string = (name: string) => typeof result[name] === "string" ? result[name] : undefined;
   return { verdict, confidence: typeof result.confidence === "number" ? result.confidence : undefined, coveredEvent: boolean("covered_event"), evidenceSufficient: boolean("evidence_sufficient"), lossSupported: boolean("loss_supported"), policyMatch: boolean("policy_match"), reasonCode: string("reason_code"), recommendedAction: string("recommended_action"), reasoningSummary: string("reasoning_summary"), timestamp: new Date().toISOString() };
+}
+/**
+ * Phase 2's read-only transaction metadata check. A claim may reference a Bradbury
+ * transaction, which GenLayerJS can look up without a signer or a write.
+ * This observation cannot establish evidence truth, claim relevance, or alter a
+ * ProofCourt business verdict.
+ */
+export async function verifyOnchainReference(referenceId?: string): Promise<OnchainVerification> {
+  const reference = referenceId?.trim(); const observedAt = new Date().toISOString();
+  if (!reference) return { method: "GENLAYER_TRANSACTION_LOOKUP", status: "NOT_PROVIDED", observedAt, message: "No GenLayer transaction reference was provided." };
+  if (!/^0x[0-9a-fA-F]{64}$/.test(reference)) return { method: "GENLAYER_TRANSACTION_LOOKUP", status: "INVALID_REFERENCE", reference, observedAt, message: "This reference is not a 32-byte GenLayer transaction ID, so no on-chain lookup was performed." };
+  const rpcUrl = readRpcUrl();
+  if (!rpcUrl) return { method: "GENLAYER_TRANSACTION_LOOKUP", status: "UNAVAILABLE", reference, observedAt, message: "Bradbury read access is not configured, so the reference could not be checked." };
+  try {
+    const transaction = await client(rpcUrl).getTransaction({ hash: reference as never });
+    const lifecycle = transaction.statusName || (typeof transaction.status === "string" ? transaction.status : undefined);
+    return { method: "GENLAYER_TRANSACTION_LOOKUP", status: "LOCATED", reference, transactionId: transaction.txId || transaction.hash || reference, sender: transaction.sender || transaction.from_address, recipient: transaction.recipient || transaction.to_address, value: transaction.value == null ? undefined : String(transaction.value), lifecycle, executionResult: transaction.txExecutionResultName, observedAt, message: "The referenced GenLayer transaction was located on Bradbury. This only confirms transaction metadata, not the truth of uploaded evidence." };
+  } catch {
+    return { method: "GENLAYER_TRANSACTION_LOOKUP", status: "UNAVAILABLE", reference, observedAt, message: "The GenLayer network could not confirm this reference at the time of lookup." };
+  }
 }
 /** Submit only; final state is subsequently recovered through refreshAdjudication. */
 export async function submitAdjudication(_claim: Claim, canonical: string, hash: string): Promise<Transaction> {
