@@ -54,7 +54,7 @@ Current GenLayer capabilities support validator-side [web access](https://docs.g
 
 ## Persistence and recovery
 
-For this self-hosted MVP, `.proofcourt-data/claims.json` and private evidence files provide restart persistence with atomic database replacement. Set `PROOFCOURT_DATA_DIR` to a durable mounted volume in deployment. This filesystem store is not appropriate for stateless/serverless production; replace it with a transactional database and private object storage before production. The directory is ignored by Git.
+ProofCourt persists claims, verdict state, and private evidence bytes in PostgreSQL. Set `DATABASE_URL` to a managed PostgreSQL connection string (the Vercel Neon integration provides one). Evidence stays private and off-chain in the database; the public immutable TXT URL used by Phase 2 remains a separate, opt-in reference.
 
 ## Environment
 
@@ -65,7 +65,7 @@ GENLAYER_RPC_URL=https://studio-dev.genlayer.com/api
 GENLAYER_PRIVATE_KEY=
 GENLAYER_CONTRACT_ADDRESS=
 GENLAYER_CHAIN_ID=61997
-PROOFCOURT_DATA_DIR=
+DATABASE_URL=
 ```
 
 ProofCourt uses the release-candidate `studioDevnet` network definition from `genlayer-js@2.0.0-rc.1`: canonical Studio-dev RPC `https://studio-dev.genlayer.com/api`, chain ID `61997`, and `GEN`. Do not substitute a manually assembled chain object or a stable-network definition.
