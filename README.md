@@ -16,7 +16,7 @@ The backend never computes or overrides `APPROVED`, `DENIED`, or `ESCALATED`. It
 
 ## Current implementation status
 
-The local MVP API, evidence pipeline, canonicalization, contract source, and server-only GenLayerJS signer adapter are present. Live Bradbury submission is fail-closed whenever `GENLAYER_PRIVATE_KEY`, `GENLAYER_CONTRACT_ADDRESS`, or the expected chain configuration is absent. It never manufactures a transaction ID or business verdict.
+The local MVP API, evidence pipeline, canonicalization, contract source, and server-only GenLayerJS signer adapter are present. Live Studio-dev submission is fail-closed whenever `GENLAYER_PRIVATE_KEY`, `GENLAYER_CONTRACT_ADDRESS`, or the expected chain configuration is absent. It never manufactures a transaction ID or business verdict.
 
 Phase 1 (Evidence → Consensus → Verdict) is complete. Phase 2 (Evidence Verification Layer) is complete: it combines SHA-256 evidence integrity, GenLayer validator-backed content assessment for the supported immutable public TXT evidence path, and objective blockchain/on-chain transaction verification. Private evidence remains private; these layers do not claim that a hash proves truth, that AI guarantees authenticity, or that arbitrary PDFs/images are automatically verified. Phases 3–5 (multi-source intelligence, insurance pools/payouts, and a decentralized marketplace) remain future roadmap only.
 
@@ -61,14 +61,14 @@ For this self-hosted MVP, `.proofcourt-data/claims.json` and private evidence fi
 Copy `.env.example` to `.env.local`. All GenLayer values are server-only; never use `NEXT_PUBLIC_` for them and never commit `.env.local`.
 
 ```bash
-GENLAYER_RPC_URL=https://rpc-bradbury.genlayer.com
+GENLAYER_RPC_URL=https://studio-dev.genlayer.com/api
 GENLAYER_PRIVATE_KEY=
 GENLAYER_CONTRACT_ADDRESS=
-GENLAYER_CHAIN_ID=4221
+GENLAYER_CHAIN_ID=61997
 PROOFCOURT_DATA_DIR=
 ```
 
-Bradbury currently uses the GenLayer RPC above, chain ID `4221`, and `GEN`; verify this against the [official network documentation](https://docs.genlayer.com/developers/networks) before deployment.
+ProofCourt uses the release-candidate `studioDevnet` network definition from `genlayer-js@2.0.0-rc.1`: canonical Studio-dev RPC `https://studio-dev.genlayer.com/api`, chain ID `61997`, and `GEN`. Do not substitute a manually assembled chain object or a stable-network definition.
 
 ## Development and deployment
 
@@ -80,7 +80,7 @@ npm run lint
 npm run build
 ```
 
-Deploy `contracts/InsuranceCourt.py` through the current GenLayer CLI or Studio workflow, record the verified address in `.env.local`, and configure the server-side signer before enabling live submission. Do not treat EVM submission as finality; monitor the GenLayer lifecycle and persist only the authoritative finalized contract result.
+Deploy `contracts/InsuranceCourt.py` through the matching v0.6 RC GenLayer CLI or Studio-dev workflow, record the verified address in `.env.local`, and configure the server-side signer before enabling live submission. Deploys and writes must estimate current fees and submit the returned fee distribution/value; do not treat EVM submission as finality. Monitor the GenLayer lifecycle and persist only an authoritative finalized, successfully executed contract result.
 
 ## Demo versus live mode
 

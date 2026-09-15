@@ -1,7 +1,13 @@
+import { studioDevnet } from "genlayer-js/chains";
+
+// Keep chain identity, RPC, and Consensus v0.6 deployment addresses coupled
+// through the RC SDK's canonical network definition.
 export const GENLAYER_NETWORK = {
-  name: "Bradbury", chainId: 4221, currency: "GEN",
-  rpcUrl: "https://rpc-bradbury.genlayer.com",
-  explorerUrl: "https://explorer-bradbury.genlayer.com",
+  name: studioDevnet.name,
+  chainId: studioDevnet.id,
+  currency: studioDevnet.nativeCurrency.symbol,
+  rpcUrl: studioDevnet.rpcUrls.default.http[0],
+  explorerUrl: "https://explorer-studio-dev.genlayer.com",
 } as const;
 
 export const terminalStatuses = new Set(["FINALIZED", "APPROVED", "DENIED", "ESCALATED", "FAILED", "UNDETERMINED"]);

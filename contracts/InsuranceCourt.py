@@ -29,7 +29,7 @@ class InsuranceCourt(gl.Contract):
     evidence_verifications: TreeMap[str, str]
 
     def __init__(self):
-        # Generic storage has no type erasure. Bradbury requires this allocator,
+        # Generic storage has no type erasure. The GenLayer runtime requires this allocator,
         # not a direct TreeMap() assignment (which caused TreeMap <- TreeMap).
         self.verdicts = gl.storage.inmem_allocate(TreeMap[str, str])
         self.evidence_verifications = gl.storage.inmem_allocate(TreeMap[str, str])

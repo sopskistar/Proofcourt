@@ -7,13 +7,15 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "deploy:studio-dev": "node scripts/deploy-studio-dev.mjs"
   },
   "dependencies": {
+    "@genlayer/transaction-kit": "0.1.0-rc.2",
     "@types/node": "22.10.2",
     "@types/react": "19.0.2",
     "@types/react-dom": "19.0.2",
-    "genlayer-js": "^1.1.8",
+    "genlayer-js": "2.0.0-rc.1",
     "lucide-react": "^0.468.0",
     "next": "^15.1.0",
     "react": "^19.0.0",
