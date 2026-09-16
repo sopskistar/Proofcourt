@@ -30,6 +30,29 @@ function submissionErrorDetail(error: unknown, privateKey: string) {
   // escape to a client response or application log.
   return message.replaceAll(privateKey, "[REDACTED]");
 }
+function readErrorDetail(error: unknown) {
+  const message = error instanceof Error ? error.message : "Unknown GenLayer read error";
+  // Error objects occasionally include an RPC request. Keep operational logs
+  // useful without allowing a configured credential to leak from a provider.
+  return message.replace(/0x[0-9a-fA-F]{64}/g, "[REDACTED_32_BYTE_VALUE]").slice(0, 1_000);
+}
+async function logExecutionFailure(transactionId: string, lifecycle: string, execution: unknown) {
+  try {
+    const trace = await client().debugTraceTransaction({ hash: transactionId as never });
+    // Trace stdout/return data may include claim inputs. stderr and the result
+    // code are enough for production diagnosis, so retain those only in the
+    // server log and never put them in the claim API response.
+    console.error("GenLayer adjudication execution failed", {
+      transactionId,
+      lifecycle,
+      executionResult: execution,
+      resultCode: trace.result_code,
+      stderr: trace.stderr.slice(0, 2_000),
+    });
+  } catch (error) {
+    console.error("GenLayer adjudication execution failed; trace unavailable", { transactionId, lifecycle, executionResult: execution, traceError: readErrorDetail(error) });
+  }
+}
 function readRpcUrl() {
   const rpcUrl = process.env.GENLAYER_RPC_URL?.trim();
   const configuredChainId = process.env.GENLAYER_CHAIN_ID?.trim();
@@ -104,10 +127,23 @@ export async function refreshAdjudication(claim: Claim): Promise<Refresh | undef
   try {
     const live = await client().getTransaction({ hash: prior.genlayerTransactionId as never });
     const lifecycle = typeof (live.statusName ?? live.status) === "string" ? (live.statusName ?? live.status) as string : String(live.status || "PENDING");
-    const execution = live.txExecutionResultName; const next: Transaction = { ...prior, genlayerTransactionId: live.txId || live.hash || prior.genlayerTransactionId, finalizationStatus: lifecycle };
+    const execution = live.txExecutionResultName; const next: Transaction = { ...prior, genlayerTransactionId: live.txId || live.hash || prior.genlayerTransactionId, finalizationStatus: lifecycle, executionResult: execution };
     const status = statusFor(lifecycle, execution, isSuccessful(live));
-    if (status !== "FINALIZED") { if (status === "FAILED") next.failureCode = execution === "FINISHED_WITH_ERROR" ? "EXECUTION_FAILED" : lifecycle; return { adjudication: next, status }; }
-    const value = await client().readContract({ address: config.contractAddress, functionName: "get_verdict", args: [claim.claimHash || prior.claimHash || ""] });
+    if (status !== "FINALIZED") {
+      if (status === "FAILED") {
+        next.failureCode = execution === "FINISHED_WITH_ERROR" ? "EXECUTION_FAILED" : lifecycle;
+        next.failureMessage = execution === "FINISHED_WITH_ERROR" ? "GenLayer finalized this transaction with a contract execution error. The server recorded the transaction trace for diagnosis." : "GenLayer ended this transaction before an authoritative verdict was produced.";
+        if (execution === "FINISHED_WITH_ERROR") await logExecutionFailure(next.genlayerTransactionId!, lifecycle, execution);
+      }
+      return { adjudication: next, status };
+    }
+    let value: unknown;
+    try {
+      value = await client().readContract({ address: config.contractAddress, functionName: "get_verdict", args: [claim.claimHash || prior.claimHash || ""] });
+    } catch (error) {
+      console.error("GenLayer finalized adjudication verdict read failed", { transactionId: next.genlayerTransactionId, claimHash: claim.claimHash || prior.claimHash, error: readErrorDetail(error) });
+      return { adjudication: { ...next, failureCode: "BACKEND_VERDICT_READ_FAILED", failureMessage: "The transaction executed, but ProofCourt could not read its authoritative verdict. The server recorded the read failure." }, status: "FAILED" };
+    }
     const verdict = verdictFrom(value);
     if (!verdict) return { adjudication: { ...next, failureCode: "FINAL_VERDICT_UNAVAILABLE", failureMessage: "The transaction finalized but the contract did not return a valid structured verdict." }, status: "FAILED" };
     return { adjudication: { ...next, finalizedAt: new Date().toISOString() }, status: verdict.verdict, verdict };
