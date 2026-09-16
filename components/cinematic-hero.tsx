@@ -1,19 +1,82 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowDownRight, ArrowRight } from "lucide-react";
-import { useEffect, useState } from "react";
+import { ArrowRight } from "lucide-react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 
-const stages = ["Evidence", "Verification", "Consensus", "Verdict", "Finality"];
+const stages = ["Claim", "Evidence", "Verification", "Consensus", "Verdict", "Finality"];
 
-/** Decorative, lightweight CSS/SVG product illustration; it has no live claim state. */
+/** Decorative product narrative only. It is deliberately separate from live claim state. */
 export function CinematicHero() {
-  const [active, setActive] = useState(0);
+  const ref = useRef<HTMLElement>(null);
+  const [progress, setProgress] = useState(0);
+  const [reducedMotion, setReducedMotion] = useState(false);
+
   useEffect(() => {
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
-    if (reduced.matches) { setActive(stages.length - 1); return; }
-    const timer = window.setInterval(() => setActive(value => (value + 1) % stages.length), 1800);
-    return () => window.clearInterval(timer);
+    const updatePreference = () => setReducedMotion(reduced.matches);
+    updatePreference();
+    reduced.addEventListener("change", updatePreference);
+    return () => reduced.removeEventListener("change", updatePreference);
   }, []);
-  return <section className="pc-hero"><div className="pc-shell pc-hero-grid"><div className="pc-hero-copy"><p className="pc-kicker">ProofCourt <i /> GenLayer intelligent contract</p><h1>The decentralized<br />adjudication layer<br />for the agentic economy.</h1><p className="pc-hero-tagline">Evidence. Consensus. Verdict.</p><p className="pc-hero-summary">ProofCourt turns disputed digital events into an evidence-based adjudication workflow powered by GenLayer.</p><div className="pc-hero-actions"><Link className="button" href="/claim">Submit a claim <ArrowRight size={17} /></Link><Link className="pc-text-link" href="/#how-it-works">See how it works <ArrowDownRight size={17} /></Link></div></div><div className="pc-core-wrap" aria-label="Illustrative adjudication core"><div className="pc-core-grid" aria-hidden="true" /><div className="pc-core-orbit pc-orbit-one" aria-hidden="true" /><div className="pc-core-orbit pc-orbit-two" aria-hidden="true" /><div className="pc-core"><span>PC</span><i /><i /><i /><i /></div><div className="pc-core-card pc-core-evidence"><small>01 / INPUT</small><strong>Evidence packet</strong><em>SHA-256</em></div><div className="pc-core-card pc-core-verdict"><small>04 / OUTPUT</small><strong>Verdict</strong><em>AUTHORITATIVE</em></div><div className="pc-core-route" aria-hidden="true"><i /><i /><i /></div><ol className="pc-core-stages">{stages.map((stage, index) => <li className={index <= active ? "is-active" : ""} key={stage}><span>{String(index + 1).padStart(2, "0")}</span>{stage}</li>)}</ol></div></div></section>;
+
+  useEffect(() => {
+    if (reducedMotion) { setProgress(1); return; }
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      const node = ref.current;
+      if (!node) return;
+      const bounds = node.getBoundingClientRect();
+      const compact = window.matchMedia("(max-width: 760px)").matches;
+      // The compact scene has a deliberately short sticky tail. Map that tail to
+      // the same stages as desktop instead of freezing the visual on phones.
+      const travel = compact
+        ? Math.max(1, bounds.height - window.innerHeight * .72)
+        : Math.max(1, bounds.height - window.innerHeight);
+      const next = Math.min(1, Math.max(0, -bounds.top / travel));
+      setProgress(previous => Math.abs(previous - next) > .006 ? next : previous);
+    };
+    const onScroll = () => { if (!frame) frame = requestAnimationFrame(update); };
+    update();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => { window.removeEventListener("scroll", onScroll); window.removeEventListener("resize", onScroll); if (frame) cancelAnimationFrame(frame); };
+  }, [reducedMotion]);
+
+  const active = Math.min(stages.length - 1, Math.round(progress * (stages.length - 1)));
+  const visualStyle = {
+    "--hero-progress": progress,
+    "--hero-visible": .25 + progress * .75,
+    "--hero-orbit": `${115 * progress}deg`,
+    "--hero-core-scale": .85 + progress * .15,
+    "--ring-one-offset": `${560 * (1 - progress)}px`,
+    "--ring-two-offset": `${390 * (1 - progress)}px`,
+    "--fragment-one": `translate(${(1 - progress) * -45}px, ${(1 - progress) * 18}px) rotate(-13deg)`,
+    "--fragment-two": `translate(${(1 - progress) * 45}px, ${(1 - progress) * -14}px) rotate(16deg)`,
+    "--fragment-three": `translate(${(1 - progress) * 40}px, ${(1 - progress) * 25}px) rotate(8deg)`,
+  } as CSSProperties;
+  return <section ref={ref} className="hero-scene" aria-label="ProofCourt adjudication overview" style={visualStyle}>
+    <div className="hero-scene-sticky container">
+      <div className="hero-copy hero-choreography">
+        <p className="eyebrow">ProofCourt</p>
+        <h1><span>Evidence.</span> <span>Consensus.</span><br /><em>Verdict.</em></h1>
+        <p className="lede">AI-powered insurance adjudication built on GenLayer.</p>
+        <p className="lede hero-subhead">Submit evidence. Let GenLayer validators review. Receive a transparent verdict.</p>
+        <div className="hero-actions"><Link className="button button-quiet" href="/demo">Run Demo</Link><Link className="button" href="/claim">Submit Claim <ArrowRight size={17} /></Link></div>
+      </div>
+      <div className="hero-cinematic glass-panel" aria-label="Illustrative ProofCourt adjudication visual">
+        <span className="cinematic-caption">ILLUSTRATIVE ADJUDICATION VISUAL</span>
+        <div className="cinematic-orbit" aria-hidden="true"><i /><i /><i /><i /><i /><i /></div>
+        <div className="cinematic-core" aria-hidden="true">
+          <svg viewBox="0 0 240 240" role="presentation"><circle className="core-ring ring-one" cx="120" cy="120" r="89" /><circle className="core-ring ring-two" cx="120" cy="120" r="62" /><path className="core-path" d="M55 120 94 81l26 23 26-23 39 39-39 39-26-23-26 23z" /><path className="core-path core-path-small" d="M88 120h64M120 88v64" /></svg>
+          <span className="core-seal">PC</span>
+        </div>
+        <div className="evidence-fragments" aria-hidden="true"><i /><i /><i /></div>
+        <ol className="cinematic-stages">{stages.map((stage, index) => <li className={index <= active ? "active" : ""} key={stage}><span>{String(index + 1).padStart(2, "0")}</span><strong>{stage}</strong></li>)}</ol>
+        <div className="cinematic-status"><span>SCROLL-DRIVEN PRODUCT EXPLAINER</span><b>{stages[active]}</b></div>
+      </div>
+      <div className="hero-scroll-cue" aria-hidden="true"><i /> Scroll to trace the path</div>
+    </div>
+  </section>;
 }
