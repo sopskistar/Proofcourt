@@ -2,14 +2,28 @@
 
 **Evidence. Consensus. Verdict.**
 
-ProofCourt is an AI agent liability insurance court built on GenLayer consensus. A user submits a claim and off-chain evidence; the backend validates and canonicalizes that material, then a GenLayer Intelligent Contract is the sole authority for a final structured adjudication.
+ProofCourt is an evidence-led AI-powered insurance adjudication platform built on GenLayer.
+
+It focuses on three areas of digital responsibility:
+- Agent Failure
+- Wallet Recovery
+- Digital Continuity
+
+ProofCourt turns disputed digital events into a structured workflow:
+Evidence → Verification → Consensus → Verdict → Finality.
+
+A user submits a claim and supporting evidence. ProofCourt preserves evidence integrity through hashing, canonicalizes the adjudication input, and submits the decision process to a GenLayer Intelligent Contract where validator consensus determines the authoritative result.
 
 ## Architecture
 
 ```
-Frontend → Next.js API → durable local MVP store → evidence hashing/canonicalization
-         → GenLayer InsuranceCourt → leader + independent validators
-         → Equivalence Principle → Optimistic Democracy → final verdict
+Frontend → Next.js API → PostgreSQL claim/evidence persistence
+         → evidence hashing/canonicalization
+         → GenLayer InsuranceCourt
+         → leader + independent validators
+         → Equivalence Principle
+         → Optimistic Democracy
+         → final verdict
 ```
 
 The backend never computes or overrides `APPROVED`, `DENIED`, or `ESCALATED`. It handles validation, persistence, off-chain files, SHA-256 hashing, canonical serialization, submission, and transaction monitoring. The frontend only renders the backend's authoritative final result.
@@ -54,7 +68,7 @@ Current GenLayer capabilities support validator-side [web access](https://docs.g
 
 ## Persistence and recovery
 
-ProofCourt persists claims, verdict state, and private evidence bytes in PostgreSQL. Set `DATABASE_URL` to a managed PostgreSQL connection string (the Vercel Neon integration provides one). Evidence stays private and off-chain in the database; the public immutable TXT URL used by Phase 2 remains a separate, opt-in reference.
+ProofCourt persists claims, verdict state, and private evidence bytes in PostgreSQL. Evidence remains private and off-chain in the database, while SHA-256 hashes and structured claim information are used for the adjudication workflow.
 
 ## Environment
 
@@ -95,4 +109,4 @@ Demo mode is explicitly simulated and client-only. It never calls these APIs, su
 
 ## Known limitations
 
-The MVP filesystem store is for self-hosted development only. A production deployment needs transactional persistence, private object storage, operational monitoring, and an insurance-policy/legal review. A GenLayer transaction that reaches `UNDETERMINED`, timeout, or another infrastructure lifecycle state is displayed as such and is never converted into a business verdict.
+Private evidence remains off-chain and is persisted in PostgreSQL. The current MVP does not claim that a hash proves the truth or authenticity of evidence, and private uploaded evidence is not independently inspected by GenLayer validators. The supported immutable public TXT verification path and objective blockchain transaction verification are separate evidence layers. A GenLayer transaction that reaches `UNDETERMINED`, timeout, or another infrastructure lifecycle state is displayed as such and is never converted into a business verdict.
